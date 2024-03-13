@@ -11,15 +11,15 @@ public class QuestManager : MonoBehaviour
     public Transform questPanelParent; // O pai no UI onde os painéis das quests serão instanciados
     private Dictionary<Quest, GameObject> questPanels = new Dictionary<Quest, GameObject>();
     public static int questCounter = 0;
+    public static List<Quest> quests = new List<Quest>();
 
-    void Awake()
+    private void Awake()
     {
         if (instance == null)
         {
             instance = this;
             DontDestroyOnLoad(gameObject); // Para o QuestManager
 
-            // Obtém o Canvas, que é o pai raiz do questPanelParent
             Canvas canvas = questPanelParent.GetComponentInParent<Canvas>();
             if (canvas != null)
             {
@@ -32,31 +32,57 @@ public class QuestManager : MonoBehaviour
         }
     }
 
-
-    public static int currentQuest()
+    private void Start()
     {
-        return questCounter;
+        InitializeAllQuests();
+        LoadAllQuestsProgress();
+        setNewQuest();
+        UpdateQuestPanelUI();
     }
+
+    public static void SaveAllQuestsProgress()
+    {
+        foreach (var quest in quests)
+        {
+            PlayerPrefs.SetInt($"Quest_{quest.id}_Progress", quest.currentAmount);
+            PlayerPrefs.SetInt($"Quest_{quest.id}_Completed", quest.isCompleted ? 1 : 0);
+        }
+        PlayerPrefs.SetInt("SaveState", questCounter);
+        PlayerPrefs.Save();
+    }
+
+
+    private void LoadAllQuestsProgress()
+    {
+        foreach (var quest in quests)
+        {
+            int progress = PlayerPrefs.GetInt($"Quest_{quest.id}_Progress", 0);
+            bool isCompleted = PlayerPrefs.GetInt($"Quest_{quest.id}_Completed", 0) == 1;
+            questCounter = PlayerPrefs.GetInt("SaveState");
+
+            quest.currentAmount = progress;
+            quest.isCompleted = isCompleted;
+
+            // Reative a quest somente se ela não estiver concluída.
+            if (!isCompleted)
+            {
+                quest.isActive = progress > 0; // Ativa a quest se houve progresso.
+            }
+        }
+    }
+
+
 
     public void nextQuest()
     {
         questCounter++;
-    }
-
-
-
-    public List<Quest> quests = new List<Quest>();
-
-    private void Start()
-    {
-
-        setNewQuest();
+        SaveAllQuestsProgress(); // Salva o progresso sempre que avançar para a próxima quest.
     }
 
     public void AddQuest(Quest newQuest)
     {
         quests.Add(newQuest);
-        UpdateQuestPanelUI(); // Atualiza a UI sempre que uma nova quest é adicionada
+        UpdateQuestPanelUI(); // Atualiza a UI sempre que uma nova quest é adicionada.
     }
 
     public Quest GetQuestById(string id)
@@ -71,14 +97,12 @@ public class QuestManager : MonoBehaviour
         {
             questToUpdate.currentAmount += amount;
             questToUpdate.CheckProgress();
-            UpdateQuestPanelUI(); // Atualiza a UI sempre que uma quest é atualizada
+            UpdateQuestPanelUI(); // Atualiza a UI sempre que uma quest é atualizada.
         }
     }
 
-    // Método para atualizar o painel de quests na UI
     public void UpdateQuestPanelUI()
     {
-        // Verifica se questPanelPrefab e questPanelParent são nulos
         if (questPanelPrefab == null)
         {
             Debug.LogError("QuestPanelPrefab é nulo!");
@@ -90,74 +114,61 @@ public class QuestManager : MonoBehaviour
             return;
         }
 
-        // Atualize ou crie painéis para cada quest ativa
         foreach (Quest quest in quests)
         {
             if (quest.isActive)
             {
                 GameObject questPanel;
-                // Verifique se um painel já existe para esta quest
                 if (questPanels.ContainsKey(quest))
                 {
-                    // Use o painel existente
                     questPanel = questPanels[quest];
                 }
                 else
                 {
-                    // Crie um novo painel e adicione ao dicionário
                     questPanel = Instantiate(questPanelPrefab, questPanelParent);
                     questPanels[quest] = questPanel;
                 }
 
-                // Atualize os textos do painel
                 TextMeshProUGUI titleText = questPanel.transform.Find("TITLE").GetComponent<TextMeshProUGUI>();
                 TextMeshProUGUI descriptionText = questPanel.transform.Find("DESCRIPTION").GetComponent<TextMeshProUGUI>();
                 TextMeshProUGUI progressText = questPanel.transform.Find("PROGRESS").GetComponent<TextMeshProUGUI>();
 
                 if (titleText != null) titleText.text = quest.title;
                 if (descriptionText != null) descriptionText.text = quest.description;
-                if (progressText != null) progressText.text = quest.currentAmount + "/" + quest.requiredAmount;
+                if (progressText != null) progressText.text = $"{quest.currentAmount}/{quest.requiredAmount}";
             }
         }
 
-        // Opcional: Remova painéis para quests inativas ou concluídas
         List<Quest> questsToRemove = new List<Quest>();
         foreach (var pair in questPanels)
         {
             if (!pair.Key.isActive || pair.Key.isCompleted)
             {
-                questsToRemove.Add(pair.Key); // Marque para remoção do dicionário
+                questsToRemove.Add(pair.Key);
             }
         }
         foreach (Quest quest in questsToRemove)
         {
-           CompleteQuest(quest.id);
-           questPanels.Remove(quest); // Remova do dicionário
+            CompleteQuest(quest.id);
+            questPanels.Remove(quest);
         }
     }
-
-
-
 
     public void CompleteQuest(string id)
     {
         Quest questToComplete = GetQuestById(id);
         if (questToComplete != null)
         {
-            // Marque a quest como concluída
             questToComplete.isCompleted = true;
 
-            // Atualize a UI para mostrar que a quest foi concluída
             if (questPanels.ContainsKey(questToComplete))
             {
                 GameObject questPanel = questPanels[questToComplete];
                 TextMeshProUGUI progressText = questPanel.transform.Find("PROGRESS").GetComponent<TextMeshProUGUI>();
                 if (progressText != null)
                 {
-                    progressText.text = "CONCLUÍDA!"; // Atualize o texto para mostrar que a quest foi concluída
+                    progressText.text = "CONCLUÍDA!";
                 }
-
-                // Inicie uma corrotina para lidar com o fade out e depois adicionar a nova quest
                 StartCoroutine(CompleteAndSetupNextQuest(questPanel, questToComplete.id));
             }
         }
@@ -177,29 +188,42 @@ public class QuestManager : MonoBehaviour
         UpdateQuestPanelUI(); // Atualize o painel de UI para mostrar a nova quest
     }
 
+    private void InitializeAllQuests()
+    {
+        quests.Clear(); // Certifique-se de que a lista está vazia antes de adicionar novas quests
+        quests.Add(new Quest("1", "tutorial", "Use as setas ou WASD para andar pelo quarto", 4));
+        quests.Add(new Quest("2", "Primeira vez lá fora", "Saia do seu quarto clicando E perto da porta", 1));
+    }
+
     private void setNewQuest()
     {
         Quest newQuest;
-        switch (currentQuest())
+        switch (questCounter)
         {
-            case 0:
-                newQuest = new Quest("1", "tutorial", "Use as setas ou WASD para andar pelo quarto", 4); // ID, Descrição, Progresso necessário
-                AddQuest(newQuest);
-                newQuest.ActivateQuest();
 
-                UpdateQuestPanelUI(); // Atualize o painel de UI para mostrar a nova quest
+            case 0:
+                newQuest = quests.Find(quest => quest.id == "1");
+                if (!newQuest.isCompleted) // Verifica se a quest já foi concluída
+                {
+                    newQuest.ActivateQuest();
+                }
                 break;
+
             case 1:
-                newQuest = new Quest("2", "Primeira vez lá fora", "Saia do seu quarto clicando E perto da porta", 1);
-                AddQuest(newQuest);
-                newQuest.ActivateQuest();
+                newQuest = quests.Find(quest => quest.id == "2");
+                if (!newQuest.isCompleted) // Verifica se a quest já foi concluída
+                {
+                    newQuest.ActivateQuest();
+                }
                 break;
+
             case 2:
-                // Adicione aqui a lógica para outras quests
+                // Adicione mais casos conforme necessário
                 break;
-                // Adicione mais cases conforme necessário
         }
     }
+
+
 
     private IEnumerator FadeOutQuestPanel(GameObject questPanel)
     {
