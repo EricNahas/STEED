@@ -50,11 +50,7 @@ public class QuestManager : MonoBehaviour
     private void Start()
     {
 
-        Quest tutorialQuest = new Quest("1", "tutorial", "Use as setas ou WASD para andar pelo quarto", 4); // ID, Descrição, Progresso necessário
-        AddQuest(tutorialQuest);
-        tutorialQuest.ActivateQuest();
-
-        UpdateQuestPanelUI(); // Atualize o painel de UI para mostrar a nova quest
+        setNewQuest();
     }
 
     public void AddQuest(Quest newQuest)
@@ -176,9 +172,23 @@ public class QuestManager : MonoBehaviour
         nextQuest(); // Incrementa o contador de quest
 
         // Verifica qual é a próxima quest com base no contador atualizado e adiciona ela
+        setNewQuest();
+
+        UpdateQuestPanelUI(); // Atualize o painel de UI para mostrar a nova quest
+    }
+
+    private void setNewQuest()
+    {
         Quest newQuest;
         switch (currentQuest())
         {
+            case 0:
+                newQuest = new Quest("1", "tutorial", "Use as setas ou WASD para andar pelo quarto", 4); // ID, Descrição, Progresso necessário
+                AddQuest(newQuest);
+                newQuest.ActivateQuest();
+
+                UpdateQuestPanelUI(); // Atualize o painel de UI para mostrar a nova quest
+                break;
             case 1:
                 newQuest = new Quest("2", "Primeira vez lá fora", "Saia do seu quarto clicando E perto da porta", 1);
                 AddQuest(newQuest);
@@ -189,10 +199,7 @@ public class QuestManager : MonoBehaviour
                 break;
                 // Adicione mais cases conforme necessário
         }
-
-        UpdateQuestPanelUI(); // Atualize o painel de UI para mostrar a nova quest
     }
-
 
     private IEnumerator FadeOutQuestPanel(GameObject questPanel)
     {
