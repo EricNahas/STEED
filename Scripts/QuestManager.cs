@@ -10,7 +10,7 @@ public class QuestManager : MonoBehaviour
     public GameObject questPanelPrefab; // Prefab do painel da quest
     public Transform questPanelParent; // O pai no UI onde os painéis das quests serão instanciados
     private Dictionary<Quest, GameObject> questPanels = new Dictionary<Quest, GameObject>();
-    public static int questCounter = 0;
+    public static int questCounter = 5;
     public static List<Quest> quests = new List<Quest>();
 
     private void Awake()
@@ -35,7 +35,7 @@ public class QuestManager : MonoBehaviour
     private void Start()
     {
         InitializeAllQuests();
-        LoadAllQuestsProgress();
+        //LoadAllQuestsProgress();
         setNewQuest();
         UpdateQuestPanelUI();
     }
@@ -70,8 +70,6 @@ public class QuestManager : MonoBehaviour
             }
         }
     }
-
-
 
     public void nextQuest()
     {
@@ -191,8 +189,12 @@ public class QuestManager : MonoBehaviour
     private void InitializeAllQuests()
     {
         quests.Clear(); // Certifique-se de que a lista está vazia antes de adicionar novas quests
-        quests.Add(new Quest("1", "tutorial", "Use as setas ou WASD para andar pelo quarto", 4));
+        quests.Add(new Quest("1", "Bem-vindo!", "Use as setas ou AWSD para andar pelo quarto", 4));
         quests.Add(new Quest("2", "Primeira vez lá fora", "Saia do seu quarto clicando E perto da porta", 1));
+        quests.Add(new Quest("3", "Uma caminhada", "Conheça os corredores e vá para o lobby", 1));
+        quests.Add(new Quest("4", "Seu primeiro amigo", "Volte para seu quarto, clique E perto do computador e veja a aba Amigos", 1));
+        quests.Add(new Quest("5", "Já sabemos o básico", "Vá para o lobby e fale com o Atendente Ocupado e o Atendente Legal", 2));
+        quests.Add(new Quest("6", "Vá conversar", "No lobby, fale com algum vizinho até fazer amizade", 1));
     }
 
     private void setNewQuest()
@@ -206,6 +208,33 @@ public class QuestManager : MonoBehaviour
                 if (!newQuest.isCompleted) // Verifica se a quest já foi concluída
                 {
                     newQuest.ActivateQuest();
+
+                    GameObject portaObj = GameObject.FindGameObjectWithTag("Porta");
+                    GameObject esc = GameObject.FindGameObjectWithTag("Player");
+                    GameObject pc = GameObject.FindGameObjectWithTag("Computador");
+
+                    Debug.Log(portaObj + "" + esc + "" + pc);
+
+                    if (portaObj != null && esc != null && pc != null) // Checa se o objeto foi encontrado
+                    {
+                        Porta portaScript = portaObj.GetComponent<Porta>(); // Obtém a referência ao script Porta
+                        EscButtonOpcoes escBtn = esc.GetComponent<EscButtonOpcoes>();
+                        Computador pcClick = pc.GetComponent<Computador>();
+
+                        Debug.Log(portaScript + "" + escBtn + "" + pcClick);
+
+                        if (portaScript != null && escBtn != null && pcClick != null) // Checa se o script Porta está anexado ao objeto
+                        {
+                            portaScript.enabled = false; // Desativa o script Porta
+                            escBtn.enabled = false;
+                            pcClick.enabled = false;    
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogError("null");
+                    }
+
                 }
                 break;
 
@@ -213,12 +242,67 @@ public class QuestManager : MonoBehaviour
                 newQuest = quests.Find(quest => quest.id == "2");
                 if (!newQuest.isCompleted) // Verifica se a quest já foi concluída
                 {
+
+                    GameObject portaObj = GameObject.FindGameObjectWithTag("Porta");
+                    GameObject esc = GameObject.FindGameObjectWithTag("Player");
+                    GameObject pc = GameObject.FindGameObjectWithTag("Computador");
+
+                    Debug.Log(portaObj + "" + esc + "" + pc);
+
+                    if (portaObj != null && esc != null && pc != null) // Checa se o objeto foi encontrado
+                    {
+                        Porta portaScript = portaObj.GetComponent<Porta>(); // Obtém a referência ao script Porta
+                        EscButtonOpcoes escBtn = esc.GetComponent<EscButtonOpcoes>();
+                        Computador pcClick = pc.GetComponent<Computador>();
+
+                        Debug.Log(portaScript + "" + escBtn + "" + pcClick);
+
+                        if (portaScript != null && escBtn != null && pcClick != null) // Checa se o script Porta está anexado ao objeto
+                        {
+                            portaScript.enabled = true; // Desativa o script Porta
+                            escBtn.enabled = true;
+                            pcClick.enabled = true;
+                        }
+                    }
+
                     newQuest.ActivateQuest();
                 }
                 break;
 
             case 2:
-                // Adicione mais casos conforme necessário
+                newQuest = quests.Find(quest => quest.id == "3");
+                if (!newQuest.isCompleted) // Verifica se a quest já foi concluída
+                {
+                    newQuest.ActivateQuest();
+                }
+
+                break;
+
+            case 3:
+                newQuest = quests.Find(quest => quest.id == "4");
+                if (!newQuest.isCompleted) // Verifica se a quest já foi concluída
+                {
+                    newQuest.ActivateQuest();
+
+                }
+                break;
+
+            case 4:
+                newQuest = quests.Find(quest => quest.id == "5");
+                if (!newQuest.isCompleted) // Verifica se a quest já foi concluída
+                {
+                    newQuest.ActivateQuest();
+
+                }
+                break;
+
+            case 5:
+                newQuest = quests.Find(quest => quest.id == "6");
+                if (!newQuest.isCompleted) // Verifica se a quest já foi concluída
+                {
+                    newQuest.ActivateQuest();
+
+                }
                 break;
         }
     }

@@ -7,9 +7,12 @@ using TMPro;
 using System.Globalization;
 using System.Data;
 using Unity.Burst.Intrinsics;
-using UnityEditor.VersionControl;
 using UnityEngine.Rendering.VirtualTexturing;
 using Unity.VisualScripting;
+using static ChatGPT;
+using System.Linq;
+using MiniJSON;
+using System;
 
 public class ChatGPT : MonoBehaviour
 {
@@ -17,10 +20,15 @@ public class ChatGPT : MonoBehaviour
     public TextMeshProUGUI responseText;
     public TextMeshProUGUI PlayerText;
     private string apiURL = "https://api.openai.com/v1/chat/completions";
-    private string apiKey = "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";
+    private string apiKey = "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";
     private string promptPrefix;
-    private AntagonistaScript antagonistaPrincipal = new AntagonistaScript();
+    public bool isAntagonist = false;
+    private static AntagonistaScript antagonistaPrincipal = new AntagonistaScript();
+    public PersonagemNPCScript personagemNPCScript;
+    public int messageCounter = 0;
+
     public PlayerController movimentoplayer;
+    public NPCWalk movimentoNPC;
 
     private WaitForSeconds messageDuration = new WaitForSeconds(4f); // Tempo em segundos para a caixa de texto permanecer ativa
     private WaitForSeconds messageDuration2 = new WaitForSeconds(6f);
@@ -29,7 +37,8 @@ public class ChatGPT : MonoBehaviour
     // Função para enviar mensagem e receber resposta
     public void SendMessageToChatGPT(string message)
     {
-        StartCoroutine(SendAndReceiveMessage(message));
+        StartCoroutine(SendAndReceiveMessage(message, true));
+        messageCounter++;
     }
 
     public void Speak()
@@ -37,10 +46,11 @@ public class ChatGPT : MonoBehaviour
         if (userInputField.gameObject.activeInHierarchy && userInputField.text != "")
         {
             SendMessageToChatGPT(userInputField.text);
-            antagonistaPrincipal.addMessageLog(userInputField.text);
             PlayerText.text = userInputField.text;
             userInputField.text = ""; // Limpa o campo de entrada após o envio
             movimentoplayer.enabled = true;
+            if (movimentoNPC != null)
+                movimentoNPC.enabled = true;
             PlayerText.gameObject.SetActive(true);
             StartCoroutine(DisablePlayerText());
             StartCoroutine(JustWait());
@@ -51,6 +61,8 @@ public class ChatGPT : MonoBehaviour
             userInputField.gameObject.SetActive(true); // Ativa o campo de entrada
             userInputField.ActivateInputField(); // Foca no campo de entrada
             movimentoplayer.enabled = false;
+            if (movimentoNPC != null)
+                movimentoNPC.enabled = false;
             PlayerText.text = "";
         }
     }
@@ -60,16 +72,58 @@ public class ChatGPT : MonoBehaviour
         yield return messageDuration2;
         responseText.gameObject.SetActive(true);
     }
-    IEnumerator SendAndReceiveMessage(string message)
+    IEnumerator SendAndReceiveMessage(string message, bool aparecer, Action<string> callback = null)
     {
-        promptPrefix = antagonistaPrincipal.returnPromptPrefix();
-        string fullMessage = promptPrefix + message; // Combina script prévio com a mensagem do usuário
+        string json = "";
 
-        // Construa o JSON com os parâmetros desejados
-        string json = "{\"model\": \"gpt-3.5-turbo\", \"messages\": [{\"role\": \"user\", \"content\": \"" + EscapeJson(fullMessage) + "\"}]}";
-        Debug.Log("Request JSON: " + json);
+        if (aparecer)
+        {
+            if (isAntagonist)
+            {
+                promptPrefix = antagonistaPrincipal.returnPromptPrefix();
+                antagonistaPrincipal.addMessageLog(message);
+
+                Debug.Log(antagonistaPrincipal.getMesssageLog().Count(c => c == '\n'));
+
+                if (antagonistaPrincipal.getCounter() == 11)
+                {
+                    VamosSeuQuarto(message, (resultado) =>
+                    {
+                        if (resultado)
+                        {
+                            PlayerPrefs.SetString("AntagonistaFollow", "true");
+                            Debug.Log("Resposta é true");
+                        }
+                        else
+                        {
+                            PlayerPrefs.SetString("AntagonistaFollow", "false");
+                            Debug.Log("Resposta é false");
+                        }
+
+                        antagonistaPrincipal.increaseScene();
+                    });
+                }
+            }
+
+            else
+            {
+                promptPrefix = personagemNPCScript.returnPromptPrefix();
+                personagemNPCScript.addMessageLog(message);
+            }
+
+            string fullMessage = promptPrefix + message; // Combina script prévio com a mensagem do usuário
+                                     
+            json = "{\"model\": \"gpt-3.5-turbo\", \"messages\": [{\"role\": \"user\", \"content\": \"" + EscapeJson(fullMessage) + "\"}]}";
+
+        }
+        else
+        {
+            json = "{\"model\": \"gpt-3.5-turbo\", \"messages\": [{\"role\": \"user\", \"content\": \"" + EscapeJson(message) + "\"}]}";
+        }
+
 
         var postData = Encoding.UTF8.GetBytes(json);
+
 
         using (UnityWebRequest request = new UnityWebRequest(apiURL, "POST"))
         {
@@ -90,10 +144,44 @@ public class ChatGPT : MonoBehaviour
             {
                 Debug.Log("Received: " + request.downloadHandler.text);
                 string response = ProcessResponse(request.downloadHandler.text);
-                responseText.text = response; // Atualize o campo de texto de resposta
-                antagonistaPrincipal.addMessageLog(response);
+
+                if (aparecer)
+                {
+                    responseText.text = response; // Atualize o campo de texto de resposta
+
+                    Debug.Log(response);
+
+                    if (isAntagonist)
+                    {
+                        antagonistaPrincipal.addMessageLog(response);
+                        
+                    }
+                    else
+                    {
+                        personagemNPCScript.addMessageLog(response);
+
+                    }
+                }
+                else
+                {
+                    callback?.Invoke(response);
+                }
+                
             }
         }
+    }
+
+    private void VamosSeuQuarto(string message, Action<bool> callback)
+    {
+        string prompt = "Sua resposta deve ser apenas 'true' ou 'false'. Caso a mensagem contenha uma resposta afirmativa ('sim', 'claro', 'vamos', 'com certeza', 'bora', 'tá bom', 'tudo bem', 'simbora' e outros), ou uma solicitação para ir para seu quarto ('Vamos pro meu quarto' ou algo assim) true. Caso haja uma resposta negativa ou algo que não se" +
+            " encaixe, false. Segue a mensagem a ser analisada: ";
+        prompt += message;
+
+        StartCoroutine(SendAndReceiveMessage(prompt, false, (response) =>
+        {
+            bool resultado = response.Trim().ToLower().Contains("true");
+            callback.Invoke(resultado);
+        }));
     }
 
     private string EscapeJson(string s)
@@ -133,6 +221,7 @@ public class ChatGPT : MonoBehaviour
         {
             if (choice != null && choice.message != null && choice.message.role == "assistant")
             {
+
                 return choice.message.content; // Retorna o conteúdo da mensagem do assistente
             }
         }
